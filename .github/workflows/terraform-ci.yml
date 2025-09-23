@@ -1,0 +1,37 @@
+name: terraform-ci
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Configure AWS creds via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-1' }}
+
+      - name: Terraform Init/Validate/Plan
+        run: |
+          terraform -chdir=infra init -input=false
+          terraform -chdir=infra fmt -check
+          terraform -chdir=infra validate
+          terraform -chdir=infra plan -out=tfplan
+
+      - name: Terraform Apply (main only)
+        if: github.ref == 'refs/heads/main'
+        run: terraform -chdir=infra apply -auto-approve tfplan

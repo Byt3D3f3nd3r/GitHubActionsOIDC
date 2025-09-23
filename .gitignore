@@ -1,0 +1,10 @@
+# Node/Terraform basics—tweak to taste
+node_modules/
+dist/
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.vscode/
+.DS_Store

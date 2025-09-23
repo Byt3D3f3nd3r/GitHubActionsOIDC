@@ -1,0 +1,38 @@
+name: OIDC Smoke Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # required for OIDC
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
+
+      - name: Terraform (optional) - init/validate
+        if: ${{ hashFiles('infra/*.tf') != '' }}
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unzip
+          curl -fsSL https://releases.hashicorp.com/terraform/1.9.5/terraform_1.9.5_linux_amd64.zip -o tf.zip
+          unzip tf.zip && sudo mv terraform /usr/local/bin/
+          terraform -chdir=infra init -input=false
+          terraform -chdir=infra validate
