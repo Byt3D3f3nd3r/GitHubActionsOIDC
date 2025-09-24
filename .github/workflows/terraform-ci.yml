@@ -1,0 +1,49 @@
+name: terraform-ci
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  plan-apply:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        env: [dev, prod]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unzip
+          curl -fsSL https://releases.hashicorp.com/terraform/1.9.5/terraform_1.9.5_linux_amd64.zip -o tf.zip
+          unzip tf.zip && sudo mv terraform /usr/local/bin/
+
+      - name: Terraform Init
+        working-directory: envs/${{ matrix.env }}
+        run: terraform init -input=false
+
+      - name: Terraform Plan
+        if: github.event_name != 'push'
+        working-directory: envs/${{ matrix.env }}
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform Apply (main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: envs/${{ matrix.env }}
+        run: terraform apply -input=false -auto-approve
